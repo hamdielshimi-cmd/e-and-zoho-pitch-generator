@@ -240,63 +240,65 @@ const ZohoPitchGenerator = () => {
   };
 
   // Enhanced analysis with AI
-  const handleAnalyze = async () => {
-    if (!formData.companyName || (!formData.companyUrl && !formData.facebook && !formData.instagram && !formData.linkedin && !formData.tiktok)) {
-  alert(text[language].validation);
-  return;
-}
-    
-    if (!formData.companyName || (!formData.companyUrl && !formData.facebook && !formData.instagram && !formData.linkedin && !formData.tiktok)) {
-      alert(text[language].validation);
-      return;
-    }
+const handleAnalyze = async () => {
+  // Check for sales representative name
+  if (!salesRepName.trim()) {
+    alert(text[language].nameValidation);
+    return;
+  }
+  
+  // Check for company name AND at least one link
+  if (!formData.companyName.trim() || (!formData.companyUrl.trim() && !formData.facebook.trim() && !formData.instagram.trim() && !formData.linkedin.trim() && !formData.tiktok.trim())) {
+    alert(text[language].validation);
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
+  
+  try {
+    const industryResult = await detectIndustry(formData);
     
-    try {
-      const industryResult = await detectIndustry(formData);
-      
-      // Generate AI insights if enabled
-      let aiInsights = '';
-      if (aiEnabled && knowledgeBase) {
-        aiInsights = await generateAIContent({
-          companyData: formData,
-          industry: industryResult.industry,
-          knowledgeBase,
-          objections,
-          task: 'generate_proposal_insights',
-          language
-        });
-      }
-
-      setIndustryData({
+    // Generate AI insights if enabled
+    let aiInsights = '';
+    if (aiEnabled && knowledgeBase) {
+      aiInsights = await generateAIContent({
+        companyData: formData,
         industry: industryResult.industry,
-        challenges: industryChallenges[industryResult.industry] || [],
-        services: zohoServices[industryResult.industry] || [],
-        aiEnhanced: industryResult.aiEnhanced,
-        insights: aiInsights
+        knowledgeBase,
+        objections,
+        task: 'generate_proposal_insights',
+        language
       });
-      
-      setSelectedServices(zohoServices[industryResult.industry] || []);
-      setAiInsights(aiInsights);
-      
-    } catch (error) {
-      console.error('Analysis error:', error);
-      // Fallback to standard analysis
-      const industry = 'التجزئة والتجارة الإلكترونية';
-      setIndustryData({
-        industry,
-        challenges: industryChallenges[industry] || [],
-        services: zohoServices[industry] || [],
-        aiEnhanced: false,
-        insights: ''
-      });
-      setSelectedServices(zohoServices[industry] || []);
-    } finally {
-      setLoading(false);
-      setCurrentPage(2);
     }
-  };
+
+    setIndustryData({
+      industry: industryResult.industry,
+      challenges: industryChallenges[industryResult.industry] || [],
+      services: zohoServices[industryResult.industry] || [],
+      aiEnhanced: industryResult.aiEnhanced,
+      insights: aiInsights
+    });
+    
+    setSelectedServices(zohoServices[industryResult.industry] || []);
+    setAiInsights(aiInsights);
+    
+  } catch (error) {
+    console.error('Analysis error:', error);
+    // Fallback to standard analysis
+    const industry = 'التجزئة والتجارة الإلكترونية';
+    setIndustryData({
+      industry,
+      challenges: industryChallenges[industry] || [],
+      services: zohoServices[industry] || [],
+      aiEnhanced: false,
+      insights: ''
+    });
+    setSelectedServices(zohoServices[industry] || []);
+  } finally {
+    setLoading(false);
+    setCurrentPage(2);
+  }
+};
 
   // Enhanced PDF generation with AI content
   const generatePDF = async () => {
