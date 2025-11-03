@@ -241,10 +241,10 @@ const ZohoPitchGenerator = () => {
 
   // Enhanced analysis with AI
   const handleAnalyze = async () => {
-    if (!salesRepName.trim()) {
-      alert(text[language].nameValidation);
-      return;
-    }
+    if (!formData.companyName || (!formData.companyUrl && !formData.facebook && !formData.instagram && !formData.linkedin && !formData.tiktok)) {
+  alert(text[language].validation);
+  return;
+}
     
     if (!formData.companyName || (!formData.companyUrl && !formData.facebook && !formData.instagram && !formData.linkedin && !formData.tiktok)) {
       alert(text[language].validation);
