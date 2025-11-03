@@ -1,3 +1,6 @@
+/* Arabic font support */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -49,8 +52,6 @@ body {
   background: #555;
 }
 
-/* Arabic font support */
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 
 .arabic-font {
   font-family: 'Tajawal', 'Tahoma', 'Arial', sans-serif;
