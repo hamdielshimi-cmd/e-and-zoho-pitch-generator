@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Globe, Building2, ChevronRight, Download, BarChart3, Users, FileText, Sparkles, Brain } from 'lucide-react';
-import { processPDFsFromDrive } from '../services/pdfService';
-import { generateAIContent } from '../services/geminiService';
 
 const ZohoPitchGenerator = () => {
   const [language, setLanguage] = useState('ar'); // Default to Arabic
@@ -11,7 +9,6 @@ const ZohoPitchGenerator = () => {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [salesRepName, setSalesRepName] = useState('');
   const [aiEnabled, setAiEnabled] = useState(true);
-  const [knowledgeBase, setKnowledgeBase] = useState(null);
   
   const [formData, setFormData] = useState({
     companyName: '',
@@ -26,71 +23,9 @@ const ZohoPitchGenerator = () => {
   const [industryData, setIndustryData] = useState(null);
   const [objections, setObjections] = useState('');
   const [selectedServices, setSelectedServices] = useState([]);
-  const [analytics, setAnalytics] = useState({ totalPDFs: 0, services: {} });
-  const [aiInsights, setAiInsights] = useState('');
 
   const ZOHO_LOGO = "https://ik.imagekit.io/xtj3m9hth/image-removebg-preview%20(3).png?updatedAt=1761664841869";
   const ETISALAT_LOGO = "https://ik.imagekit.io/xtj3m9hth/image-removebg-preview%20(4).png?updatedAt=1761664842867";
-
-  // Load knowledge base on component mount
-  useEffect(() => {
-    loadKnowledgeBase();
-    loadAnalytics();
-  }, []);
-
-  const loadKnowledgeBase = async () => {
-    try {
-      setLoading(true);
-      const knowledge = await processPDFsFromDrive();
-      setKnowledgeBase(knowledge);
-    } catch (error) {
-      console.error('Error loading knowledge base:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAnalytics = async () => {
-    try {
-      const result = await storage.get('analytics');
-      if (result) {
-        setAnalytics(JSON.parse(result.value));
-      }
-    } catch (error) {
-      console.log('No analytics data yet');
-    }
-  };
-
-  const storage = {
-    get: async (key) => {
-      try {
-        const item = localStorage.getItem(key);
-        return item ? { value: item } : null;
-      } catch (error) {
-        return null;
-      }
-    },
-    set: async (key, value) => {
-      try {
-        localStorage.setItem(key, value);
-        return true;
-      } catch (error) {
-        return false;
-      }
-    }
-  };
-
-  const updateAnalytics = async (services) => {
-    const newAnalytics = { ...analytics };
-    newAnalytics.totalPDFs = (newAnalytics.totalPDFs || 0) + 1;
-    
-    services.forEach(service => {
-      newAnalytics.services[service.name] = (newAnalytics.services[service.name] || 0) + 1;
-    });
-    
-    await storage.set('analytics', JSON.stringify(newAnalytics));
-    setAnalytics(newAnalytics);
-  };
 
   // Comprehensive Arabic text content
   const text = {
@@ -188,20 +123,20 @@ const ZohoPitchGenerator = () => {
     }
   };
 
-  // Enhanced industry detection with AI
-  const detectIndustry = async (data) => {
+  // Enhanced industry detection
+  const detectIndustry = (data) => {
     const textContent = `${data.companyName} ${data.companyUrl} ${data.description}`.toLowerCase();
     
     const keywords = {
-      'التجزئة والتجارة الإلكترونية': ['shop', 'store', 'retail', 'ecommerce', 'e-commerce', 'product', 'sell', 'marketplace', 'متجر', 'تجزئة', 'تجارة'],
-      'اللوجستيات وسلسلة التوريد': ['logistics', 'shipping', 'transport', 'delivery', 'warehouse', 'supply', 'freight', 'لوجستيات', 'شحن', 'توصيل'],
-      'الخدمات المالية': ['bank', 'finance', 'insurance', 'investment', 'payment', 'fintech', 'wallet', 'بنك', 'تمويل', 'تأمين'],
-      'السياحة والضيافة': ['hotel', 'tourism', 'travel', 'resort', 'restaurant', 'hospitality', 'booking', 'فندق', 'سياحة', 'سفر'],
-      'العقارات والبناء': ['real estate', 'property', 'construction', 'building', 'contractor', 'developer', 'عقارات', 'بناء', 'مقاولات'],
-      'الرعاية الصحية': ['health', 'medical', 'clinic', 'hospital', 'doctor', 'pharmaceutical', 'patient', 'صحة', 'طبي', 'مستشفى']
+      'Retail & E-commerce': ['shop', 'store', 'retail', 'ecommerce', 'e-commerce', 'product', 'sell', 'marketplace'],
+      'Logistics & Supply Chain': ['logistics', 'shipping', 'transport', 'delivery', 'warehouse', 'supply'],
+      'Financial Services': ['bank', 'finance', 'insurance', 'investment', 'payment', 'fintech'],
+      'Tourism & Hospitality': ['hotel', 'tourism', 'travel', 'resort', 'restaurant', 'hospitality'],
+      'Real Estate & Construction': ['real estate', 'property', 'construction', 'building', 'contractor'],
+      'Healthcare': ['health', 'medical', 'clinic', 'hospital', 'doctor', 'pharmaceutical']
     };
 
-    let detectedIndustry = 'التجزئة والتجارة الإلكترونية';
+    let detectedIndustry = 'Retail & E-commerce';
     let maxMatches = 0;
 
     Object.entries(keywords).forEach(([industry, words]) => {
@@ -212,125 +147,60 @@ const ZohoPitchGenerator = () => {
       }
     });
 
-    // AI-enhanced industry analysis if enabled
-    if (aiEnabled && knowledgeBase) {
-      try {
-        const aiAnalysis = await generateAIContent({
-          companyData: data,
-          detectedIndustry,
-          knowledgeBase,
-          task: 'enhance_industry_analysis',
-          language
-        });
-        return {
-          industry: detectedIndustry,
-          aiEnhanced: true,
-          insights: aiAnalysis
-        };
-      } catch (error) {
-        console.error('AI analysis failed, using standard detection:', error);
-      }
-    }
-
-    return {
-      industry: detectedIndustry,
-      aiEnhanced: false,
-      insights: null
-    };
+    return detectedIndustry;
   };
 
-   // Enhanced analysis with AI
-const handleAnalyze = async () => {
-  // Check for sales representative name
-  if (!salesRepName.trim()) {
-    alert(text[language].nameValidation);
-    return;
-  }
-  
-  // Check for company name AND at least one link
-  if (!formData.companyName.trim() || (!formData.companyUrl.trim() && !formData.facebook.trim() && !formData.instagram.trim() && !formData.linkedin.trim() && !formData.tiktok.trim())) {
-    alert(text[language].validation);
-    return;
-  }
-
-  setLoading(true);
-  
-  try {
-    const industryResult = await detectIndustry(formData);
+  // Enhanced analysis with AI
+  const handleAnalyze = async () => {
+    // Check for sales representative name
+    if (!salesRepName.trim()) {
+      alert(text[language].nameValidation);
+      return;
+    }
     
-    // Generate AI insights if enabled
-    let aiInsights = '';
-    if (aiEnabled && knowledgeBase) {
-      aiInsights = await generateAIContent({
-        companyData: formData,
-        industry: industryResult.industry,
-        knowledgeBase,
-        objections,
-        task: 'generate_proposal_insights',
-        language
-      });
+    // Check for company name AND at least one link
+    if (!formData.companyName.trim() || (!formData.companyUrl.trim() && !formData.facebook.trim() && !formData.instagram.trim() && !formData.linkedin.trim() && !formData.tiktok.trim())) {
+      alert(text[language].validation);
+      return;
     }
 
-    setIndustryData({
-      industry: industryResult.industry,
-      challenges: industryChallenges[industryResult.industry] || [],
-      services: zohoServices[industryResult.industry] || [],
-      aiEnhanced: industryResult.aiEnhanced,
-      insights: aiInsights
-    });
+    setLoading(true);
     
-    setSelectedServices(zohoServices[industryResult.industry] || []);
-    setAiInsights(aiInsights);
-    
-  } catch (error) {
-    console.error('Analysis error:', error);
-    // Fallback to standard analysis
-    const industry = 'التجزئة والتجارة الإلكترونية';
-    setIndustryData({
-      industry,
-      challenges: industryChallenges[industry] || [],
-      services: zohoServices[industry] || [],
-      aiEnhanced: false,
-      insights: ''
-    });
-    setSelectedServices(zohoServices[industry] || []);
-  } finally {
-    setLoading(false);
-    setCurrentPage(2);
-  }
-};
+    try {
+      const industry = detectIndustry(formData);
+      
+      setIndustryData({
+        industry,
+        challenges: industryChallenges[industry] || [],
+        services: zohoServices[industry] || []
+      });
+      
+      setSelectedServices(zohoServices[industry] || []);
+      
+    } catch (error) {
+      console.error('Analysis error:', error);
+      // Fallback to standard analysis
+      const industry = 'Retail & E-commerce';
+      setIndustryData({
+        industry,
+        challenges: industryChallenges[industry] || [],
+        services: zohoServices[industry] || []
+      });
+      setSelectedServices(zohoServices[industry] || []);
+    } finally {
+      setLoading(false);
+      setCurrentPage(2);
+    }
+  };
 
-  // Enhanced PDF generation with AI content
   const generatePDF = async () => {
     setLoading(true);
-    await updateAnalytics(selectedServices);
-    
-    // Generate AI-enhanced content if enabled
-    let aiContent = '';
-    if (aiEnabled && knowledgeBase) {
-      try {
-        aiContent = await generateAIContent({
-          companyData: formData,
-          industry: industryData.industry,
-          selectedServices,
-          knowledgeBase,
-          objections,
-          task: 'enhance_proposal_content',
-          language
-        });
-        setAiInsights(aiContent);
-      } catch (error) {
-        console.error('AI content generation failed:', error);
-      }
-    }
-    
     setTimeout(() => {
       setLoading(false);
       setCurrentPage(3);
     }, 1000);
   };
 
-  // Enhanced download function with AI content and Arabic support
   const downloadPDF = (format) => {
     const date = new Date();
     const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
@@ -344,15 +214,12 @@ const handleAnalyze = async () => {
         pdfContent = `═══════════════════════════════════════════════════════════════════════
                         عرض ZOHO ONE التجاري
                           مدعوم من e& مصر
-${aiEnabled && aiInsights ? '                    توصيات معززة بالذكاء الاصطناعي' : ''}
 ═══════════════════════════════════════════════════════════════════════
 
 تاريخ العرض: ${formattedDate}
 معد للشركة: ${formData.companyName}
 أعد بواسطة: ${salesRepName}
-${aiEnabled ? 'معزز بالذكاء الاصطناعي: نعم' : ''}
 
-${aiInsights ? `الرؤى الذكية:\n${aiInsights}\n` : ''}
 ═══════════════════════════════════════════════════════════════════════
                           معلومات العميل
 ═══════════════════════════════════════════════════════════════════════
@@ -362,8 +229,6 @@ ${aiInsights ? `الرؤى الذكية:\n${aiInsights}\n` : ''}
 ${formData.companyUrl ? `الموقع الإلكتروني: ${formData.companyUrl}` : ''}
 
 ${formData.description ? `السياق التجاري:\n${formData.description}\n` : ''}
-
-${aiEnabled && industryData.aiEnhanced ? `تحليل الصناعة المعزز: محسن برؤى سياقية من قاعدة معرفة Zoho` : ''}
 
 ═══════════════════════════════════════════════════════════════════════
                     حلول Zoho الموصى بها
@@ -393,15 +258,12 @@ e& مصر - فريق حلول Zoho One
         pdfContent = `═══════════════════════════════════════════════════════════════════════
                         ZOHO ONE BUSINESS PROPOSAL
                           Powered by e& Egypt
-${aiEnabled && aiInsights ? '                    AI-Enhanced Recommendations' : ''}
 ═══════════════════════════════════════════════════════════════════════
 
 PROPOSAL DATE: ${formattedDate}
 PREPARED FOR: ${formData.companyName}
 PREPARED BY: ${salesRepName}
-${aiEnabled ? 'AI-ENHANCED: Yes' : ''}
 
-${aiInsights ? `AI INSIGHTS:\n${aiInsights}\n` : ''}
 ═══════════════════════════════════════════════════════════════════════
                           CLIENT INFORMATION
 ═══════════════════════════════════════════════════════════════════════
@@ -411,8 +273,6 @@ Industry: ${industryData.industry}
 ${formData.companyUrl ? `Website: ${formData.companyUrl}` : ''}
 
 ${formData.description ? `Business Context:\n${formData.description}\n` : ''}
-
-${aiEnabled && industryData.aiEnhanced ? `AI Industry Analysis: Enhanced with contextual insights from Zoho knowledge base` : ''}
 
 ═══════════════════════════════════════════════════════════════════════
                     RECOMMENDED ZOHO SOLUTIONS
@@ -445,24 +305,18 @@ e& Egypt - Zoho One Solutions Team
                         عرض ZOHO ONE التجاري
                        تحليل شامل وخارطة طريق
                           مدعوم من e& مصر
-${aiEnabled ? '                    رؤى أعمال ذكية' : ''}
 ═══════════════════════════════════════════════════════════════════════
 
 تاريخ العرض: ${formattedDate}
 معد للشركة: ${formData.companyName}
 أعد بواسطة: ${salesRepName}
 الصناعة: ${industryData.industry}
-${aiEnabled ? 'التعزيز بالذكاء الاصطناعي: مفعل - رؤى سياقية من قاعدة معرفة Zoho' : ''}
 
-${aiInsights ? `ملخص تنفيذي - مولّد بالذكاء الاصطناعي:\n${aiInsights}\n` : ''}
 ═══════════════════════════════════════════════════════════════════════
-              تحليل الصناعة المعزز بالذكاء الاصطناعي
+              تحليل الصناعة
 ═══════════════════════════════════════════════════════════════════════
 
 ${industryData.industry} - سياق السوق المصري:
-${getIndustryContext(industryData.industry, language)}
-
-${aiEnabled ? 'التحليل معزز ببيانات السوق في الوقت الفعلي وأفضل ممارسات Zoho' : ''}
 
 التحديات الرئيسية:
 ${industryData.challenges.map((challenge, idx) => `${idx + 1}. ${challenge}`).join('\n')}
@@ -476,8 +330,6 @@ ${service.desc}
 
 التسعير: ${service.pricing}
 الميزات الرئيسية: ${service.features.join(', ')}
-
-${aiEnabled ? 'التوصية الذكية: محسّنة لظروف السوق المصري وأفضل الممارسات الصناعية' : ''}
 `).join('\n')}
 
 ═══════════════════════════════════════════════════════════════════════
@@ -487,8 +339,6 @@ ${aiEnabled ? 'التوصية الذكية: محسّنة لظروف السوق �
 مندوب المبيعات: ${salesRepName}
 e& مصر - فريق حلول Zoho One
 
-${aiEnabled ? 'يتضمن هذا العرض رؤى مولدة بالذكاء الاصطناعي بناءً على مواد تدريب Zoho الشاملة وتحليل السوق المصري.' : ''}
-
 © ${date.getFullYear()} e& مصر. جميع الحقوق محفوظة.
 ═══════════════════════════════════════════════════════════════════════`;
       } else {
@@ -497,24 +347,18 @@ ${aiEnabled ? 'يتضمن هذا العرض رؤى مولدة بالذكاء ا�
                         ZOHO ONE BUSINESS PROPOSAL
                        COMPREHENSIVE ANALYSIS & ROADMAP
                           Powered by e& Egypt
-${aiEnabled ? '                    AI-Powered Business Insights' : ''}
 ═══════════════════════════════════════════════════════════════════════
 
 PROPOSAL DATE: ${formattedDate}
 PREPARED FOR: ${formData.companyName}
 PREPARED BY: ${salesRepName}
 INDUSTRY: ${industryData.industry}
-${aiEnabled ? 'AI ENHANCEMENT: Enabled - Contextual insights from Zoho knowledge base' : ''}
 
-${aiInsights ? `EXECUTIVE SUMMARY - AI GENERATED:\n${aiInsights}\n` : ''}
 ═══════════════════════════════════════════════════════════════════════
-              AI-POWERED INDUSTRY ANALYSIS
+              INDUSTRY ANALYSIS
 ═══════════════════════════════════════════════════════════════════════
 
 ${industryData.industry} - Egyptian Market Context:
-${getIndustryContext(industryData.industry, language)}
-
-${aiEnabled ? 'Analysis enhanced with real-time market data and Zoho best practices' : ''}
 
 KEY CHALLENGES:
 ${industryData.challenges.map((challenge, idx) => `${idx + 1}. ${challenge}`).join('\n')}
@@ -528,8 +372,6 @@ ${service.desc}
 
 PRICING: ${service.pricing}
 KEY FEATURES: ${service.features.join(', ')}
-
-${aiEnabled ? 'AI RECOMMENDATION: Optimized for Egyptian market conditions and industry best practices' : ''}
 `).join('\n')}
 
 ═══════════════════════════════════════════════════════════════════════
@@ -538,8 +380,6 @@ ${aiEnabled ? 'AI RECOMMENDATION: Optimized for Egyptian market conditions and i
 
 Sales Representative: ${salesRepName}
 e& Egypt - Zoho One Solutions Team
-
-${aiEnabled ? 'This proposal includes AI-generated insights based on comprehensive Zoho training materials and Egyptian market analysis.' : ''}
 
 © ${date.getFullYear()} e& Egypt. All rights reserved.
 ═══════════════════════════════════════════════════════════════════════`;
@@ -551,140 +391,11 @@ ${aiEnabled ? 'This proposal includes AI-generated insights based on comprehensi
     const link = document.createElement('a');
     link.href = url;
     const formatLabel = format === 'quick' ? (language === 'ar' ? 'سريع' : 'Quick') : (language === 'ar' ? 'مفصل' : 'Detailed');
-    const aiLabel = aiEnabled ? (language === 'ar' ? '_معزز_بالذكاء_الاصطناعي' : '_AI_Enhanced') : '';
-    link.download = `Zoho_Proposal_${formatLabel}${aiLabel}_${formData.companyName.replace(/\s+/g, '_')}_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.txt`;
+    link.download = `Zoho_Proposal_${formatLabel}_${formData.companyName.replace(/\s+/g, '_')}_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(url), 100);
-  };
-
-  const getIndustryContext = (industry, lang = 'ar') => {
-    const contexts = {
-      ar: {
-        'التجزئة والتجارة الإلكترونية': 'إيرادات التجارة الإلكترونية في مصر تشهد نموًا بمعدلات مزدوجة الرقم مع وصول نسبة انتشار الإنترنت إلى حوالي 72% في أوائل 2024. تحتاج الشركات إلى أنظمة قوية لإدارة القنوات عبر الإنترنت والتقليدية بسلاسة.',
-        'اللوجستيات وسلسلة التوريد': 'يظهر سوق الشحن واللوجستيات في مصر نموًا ثابتًا بمعدل سنوي مركب في منتصف الرقم الواحد حتى 2030. أصبح التحول الرقمي ضروريًا للتتبع الفوري والعمليات الفعالة.',
-        'الخدمات المالية': 'القطاع يشهد نموًا كبيرًا مع تبني أكثر من 80% من الشركات الصغيرة والمتوسطة للمدفوعات الرقمية ونمو المحافظ الإلكترونية بأكثر من 70% سنويًا.',
-        'السياحة والضيافة': 'القطاع يشهد ازدهارًا مع زيادة الاعتماد على الحلول الرقمية. تحسن حلول SaaS وتحليلات البيانات العمليات وتخصيص تجارب الضيوف للميزة التنافسية.',
-        'العقارات والبناء': 'خط أنابيب تطويري كبير وطلب المبيعات المسبقة يتطلب نظام CRM منظمًا، وتتبع الضمان، وإدارة العقود الرقمية للعمليات الفعالة.',
-        'الرعاية الصحية': 'تحديث قطاع الصحة يدفع نحو السجلات الطبية الإلكترونية، والاستشارات عن بعد، وتحليلات دورة الإيرادات لتحسين رعاية المرضى والكفاءة التشغيلية.'
-      },
-      en: {
-        'Retail & E-commerce': 'Egypt\'s e-commerce revenue is on double-digit growth with internet penetration ~72% in early 2024. Businesses need robust systems to manage online and offline channels seamlessly.',
-        'Logistics & Supply Chain': 'Egypt\'s freight & logistics market shows steady mid-single-digit CAGR through 2030. Digital transformation is essential for real-time tracking and efficient operations.',
-        'Financial Services': 'Sector is surging with 80%+ SMEs adopting digital payments and mobile wallets growing >70% YoY. Compliance and customer experience are key differentiators.',
-        'Tourism & Hospitality': 'Sector is booming with increased digital adoption. SaaS and data analytics optimize operations and personalize guest experiences for competitive advantage.',
-        'Real Estate & Construction': 'Large development pipeline and pre-sales demand structured CRM, escrow tracking, and digital contract management for efficient operations.',
-        'Healthcare': 'Health-sector modernization is pushing for Electronic Medical Records, tele-consultation, and revenue-cycle analytics to improve patient care and operational efficiency.'
-      }
-    };
-    
-    return contexts[lang][industry] || (lang === 'ar' 
-      ? 'التحول الرقمي أصبح ضروريًا للبقاء التنافسي في بيئة الأعمال سريعة التطور.'
-      : 'Digital transformation is essential for staying competitive in today\'s rapidly evolving business landscape.');
-  };
-
-  // Enhanced services data in Arabic
-  const zohoServices = {
-    'التجزئة والتجارة الإلكترونية': [
-      { 
-        name: 'Zoho CRM', 
-        desc: 'نظام إدارة علاقات العملاء متعدد القنوات لإغلاق الصفقات بشكل أذكى وأفضل وأسرع. مركزية بيانات العملاء وأتمتة تتبع المبيعات عبر جميع القنوات.',
-        pricing: '700-1750 جنيه/شهر',
-        features: ['إدارة العملاء المحتملين', 'عروض خطوط المبيعات', 'المساعد الذكي (Zia)', 'أتمتة قوة المبيعات']
-      },
-      { 
-        name: 'Zoho Inventory', 
-        desc: 'إدارة مخزون مركزية لقنوات المبيعات الموزعة. التحكم الفوري في المخزون لمنع البيع الزائد ونفاد المخزون عبر متاجر التجزئة والمتاجر الإلكترونية.',
-        pricing: '135-783 جنيه/شهر',
-        features: ['تتبع متعدد القنوات', 'تنبيهات المخزون المنخفض', 'إدارة الطلبات', 'علاقات الموردين']
-      }
-    ],
-    'اللوجستيات وسلسلة التوريد': [
-      { 
-        name: 'Zoho Inventory', 
-        desc: 'رؤية كاملة للمخزون عبر المستودعات المتعددة. تبسيط العمليات وتتبع المخزون في الوقت الفعلي عبر جميع المواقع.',
-        pricing: '135-783 جنيه/شهر',
-        features: ['إدارة متعددة المستودعات', 'تتبع الشحنات', 'أوامر الشراء', 'تحويلات المخزون']
-      },
-      { 
-        name: 'Zoho Analytics', 
-        desc: 'أداة التقارير والذكاء التجاري التي تحول بيانات الأعمال إلى تقارير ولوحات تحكم غنية بصريًا لمقاييس أداء سلسلة التوريد.',
-        pricing: 'مضمن في Zoho One',
-        features: ['لوحات تحكم مخصصة', 'تقارير فورية', 'مقاييس الأداء الرئيسية', 'التحليلات التنبؤية']
-      }
-    ],
-    'الخدمات المالية': [
-      { 
-        name: 'Zoho CRM', 
-        desc: 'إدارة آمنة لبيانات العملاء مع ميزات جاهزة للامتثال. مصمم للمؤسسات المالية بهندسة تراعي الخصوصية أولاً.',
-        pricing: '700-1750 جنيه/شهر',
-        features: ['تتبع الامتثال', 'تخزين بيانات آمن', 'إعداد العملاء', 'مسارات التدقيق']
-      }
-    ],
-    'السياحة والضيافة': [
-      { 
-        name: 'Zoho CRM', 
-        desc: 'إدارة علاقات الضيوف وخطوط الحجوزات بفعالية مع بيانات العملاء الشاملة وسجل التفاعلات.',
-        pricing: '700-1750 جنيه/شهر',
-        features: ['ملفات الضيوف', 'خط الحجوزات', 'تتبع الولاء', 'المتابعات المؤتمتة']
-      }
-    ],
-    'العقارات والبناء': [
-      { 
-        name: 'Zoho CRM', 
-        desc: 'تتبع العملاء المحتملين وعقارات الإدراج وتفاعلات العملاء مع إدارة خط الصفقات القوية والأتمتة.',
-        pricing: '700-1750 جنيه/شهر',
-        features: ['إدارة العقارات', 'تقييم العملاء المحتملين', 'جدولة زيارة الموقع', 'بوابة العملاء']
-      }
-    ],
-    'الرعاية الصحية': [
-      { 
-        name: 'Zoho CRM', 
-        desc: 'إدارة علاقات المرضى مع تتبع المواعيد والتاريخ الطبي وتخزين البيانات المتوافق مع معايير الخصوصية.',
-        pricing: '700-1750 جنيه/شهر',
-        features: ['سجلات المرضى', 'إدارة المواعيد', 'تتبع العلاج', 'المراسلات الآمنة']
-      }
-    ]
-  };
-
-  const industryChallenges = {
-    'التجزئة والتجارة الإلكترونية': [
-      'إدارة المخزون عبر قنوات متعددة تسبب نفاد المخزون والبيع الزائد',
-      'بيانات العملاء مبعثرة عبر المنصات مما يجعل التخصيص صعبًا',
-      'معالجة الطلبات اليدوية تسبب تأخيرات وأخطاء في التنفيذ',
-      'صعوبة تتبع سلوك العملاء وتفضيلاتهم للتسويق المستهدف'
-    ],
-    'اللوجستيات وسلسلة التوريد': [
-      'الرؤية الفورية للشحنات والمخزون عبر مواقع متعددة',
-      'عمليات التوثيق والتتبع اليدوية تؤدي إلى عدم الكفاءة',
-      'التنسيق الضعيف بين المستودعات والنقل وفرق التسليم',
-      'اتصالات محدودة مع العملاء حول حالة التسليم تسبب مشاكل في الرضا'
-    ],
-    'الخدمات المالية': [
-      'متطلبات الامتثال التنظيمي وأمن البيانات أصبحت أكثر صرامة',
-      'عمليات إعداد العملاء والوثائق المعقدة تتطلب الأتمتة',
-      'توقعات دعم العملاء متعددة القنوات من العملاء المطلعين رقميًا',
-      'صيانة التقارير المالية ومسارات التدقيق للامتثال'
-    ],
-    'السياحة والضيافة': [
-      'تقلبات الطلب الموسمية تتطلب إدارة مرنة للقدرة',
-      'إدارة تجربة الضيوف والسمعة عبر قنوات متعددة',
-      'إدارة الحجوزات عبر منصات متعددة والقنوات المباشرة',
-      'تنسيق الموظفين والتواصل خلال المواسم الذروية'
-    ],
-    'العقارات والبناء': [
-      'إدارة العملاء المحتملين وتتبع المتابعة لدورات المبيعات الطويلة',
-      'إدارة الجدول الزمني والميزانية للمشروع عبر مواقع متعددة',
-      'توقيع المستندات وإدارة العقود تتطلب حلولاً رقمية',
-      'التواصل بين أصحاب المصلحة بما في ذلك المشترين والمقاولين والموردين'
-    ],
-    'الرعاية الصحية': [
-      'جدولة مواعيد المرضى والتذكيرات المؤتمتة لتقليل عدم الحضور',
-      'إدارة السجلات الطبية مع الامتثال لمعايير الخصوصية',
-      'تعقيد فوترة التأمين ومعالجة المطالبات',
-      'تنسيق الممارسات متعددة المواقع واتصالات الموظفين'
-    ]
   };
 
   const resetApp = () => {
@@ -703,7 +414,109 @@ ${aiEnabled ? 'This proposal includes AI-generated insights based on comprehensi
     setSelectedServices([]);
     setCurrentPage(0);
     setAccessType(null);
-    setAiInsights('');
+  };
+
+  // Enhanced services data in Arabic
+  const zohoServices = {
+    'Retail & E-commerce': [
+      { 
+        name: 'Zoho CRM', 
+        desc: 'Multi-channel customer relationship management to close deals smarter, faster, and better. Centralized customer data and sales pipeline tracking across all channels.',
+        pricing: '700-1750 EGP/month',
+        features: ['Lead Management', 'Sales Pipeline Views', 'Smart Assistant (Zia)', 'Sales Force Automation']
+      },
+      { 
+        name: 'Zoho Inventory', 
+        desc: 'Centralized inventory management for distributed sales channels. Real-time stock control to prevent overselling and stockouts across retail stores and e-commerce.',
+        pricing: '135-783 EGP/month',
+        features: ['Multi-channel Tracking', 'Low Stock Alerts', 'Order Management', 'Supplier Relations']
+      }
+    ],
+    'Logistics & Supply Chain': [
+      { 
+        name: 'Zoho Inventory', 
+        desc: 'Complete visibility across warehouses for inventory. Streamline operations and track inventory in real-time across all locations.',
+        pricing: '135-783 EGP/month',
+        features: ['Multi-warehouse Management', 'Shipment Tracking', 'Purchase Orders', 'Stock Transfers']
+      },
+      { 
+        name: 'Zoho Analytics', 
+        desc: 'Business intelligence and reporting tool that turns business data into visually rich reports and dashboards for supply chain performance metrics.',
+        pricing: 'Included in Zoho One',
+        features: ['Custom Dashboards', 'Real-time Reports', 'KPI Metrics', 'Predictive Analytics']
+      }
+    ],
+    'Financial Services': [
+      { 
+        name: 'Zoho CRM', 
+        desc: 'Secure customer data management with compliance-ready features. Designed for financial institutions with privacy-first engineering.',
+        pricing: '700-1750 EGP/month',
+        features: ['Compliance Tracking', 'Secure Data Storage', 'Customer Onboarding', 'Audit Trails']
+      }
+    ],
+    'Tourism & Hospitality': [
+      { 
+        name: 'Zoho CRM', 
+        desc: 'Guest relationship management and booking pipeline management effectively with comprehensive customer data and interaction history.',
+        pricing: '700-1750 EGP/month',
+        features: ['Guest Profiles', 'Booking Pipeline', 'Loyalty Tracking', 'Automated Follow-ups']
+      }
+    ],
+    'Real Estate & Construction': [
+      { 
+        name: 'Zoho CRM', 
+        desc: 'Lead tracking and property listings management with customer interactions and powerful pipeline management and automation.',
+        pricing: '700-1750 EGP/month',
+        features: ['Property Management', 'Lead Scoring', 'Site Visit Scheduling', 'Client Portal']
+      }
+    ],
+    'Healthcare': [
+      { 
+        name: 'Zoho CRM', 
+        desc: 'Patient relationship management with appointment tracking and medical history with privacy standards compliance.',
+        pricing: '700-1750 EGP/month',
+        features: ['Patient Records', 'Appointment Management', 'Treatment Tracking', 'Secure Communications']
+      }
+    ]
+  };
+
+  const industryChallenges = {
+    'Retail & E-commerce': [
+      'Multi-channel inventory management causing stockouts and overselling',
+      'Customer data scattered across platforms making personalization difficult',
+      'Manual order processing causing delays and fulfillment errors',
+      'Difficulty tracking customer behavior and preferences for targeted marketing'
+    ],
+    'Logistics & Supply Chain': [
+      'Real-time visibility of shipments and inventory across multiple locations',
+      'Manual documentation and tracking processes leading to inefficiencies',
+      'Poor coordination between warehouses, transportation, and delivery teams',
+      'Limited customer communication about delivery status causing satisfaction issues'
+    ],
+    'Financial Services': [
+      'Regulatory compliance requirements and data security becoming more stringent',
+      'Complex customer onboarding and documentation processes requiring automation',
+      'Multi-channel customer support expectations from digitally-savvy customers',
+      'Maintaining financial reporting and audit trails for compliance'
+    ],
+    'Tourism & Hospitality': [
+      'Seasonal demand fluctuations requiring flexible capacity management',
+      'Guest experience and reputation management across multiple channels',
+      'Managing bookings across multiple platforms and direct channels',
+      'Staff coordination and communication during peak seasons'
+    ],
+    'Real Estate & Construction': [
+      'Lead management and follow-up tracking for long sales cycles',
+      'Project schedule and budget management across multiple sites',
+      'Document signing and contract management requiring digital solutions',
+      'Communication between stakeholders including buyers, contractors, and suppliers'
+    ],
+    'Healthcare': [
+      'Patient appointment scheduling and automated reminders to reduce no-shows',
+      'Medical record management with privacy standards compliance',
+      'Complex insurance billing and claims processing',
+      'Multi-location practice coordination and staff communications'
+    ]
   };
 
   const TopBar = () => (
@@ -818,9 +631,6 @@ ${aiEnabled ? 'This proposal includes AI-generated insights based on comprehensi
     );
   }
 
-  // Rest of the component remains similar but with proper RTL support
-  // ... [Previous component code continues with RTL adjustments]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-yellow-50" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <TopBar />
@@ -876,7 +686,72 @@ ${aiEnabled ? 'This proposal includes AI-generated insights based on comprehensi
                 />
               </div>
 
-              {/* Rest of the form fields with RTL support */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                  {text[language].companyUrl}
+                </label>
+                <input
+                  type="url"
+                  value={formData.companyUrl}
+                  onChange={(e) => setFormData({...formData, companyUrl: e.target.value})}
+                  className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                  placeholder={language === 'ar' ? 'https://example.com' : 'https://example.com'}
+                  dir={language === 'ar' ? 'rtl' : 'ltr'}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                  {text[language].description}
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                  rows={4}
+                  placeholder={text[language].descPlaceholder}
+                  dir={language === 'ar' ? 'rtl' : 'ltr'}
+                />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4 uppercase tracking-wide">{text[language].socialLinks}</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <input
+                    type="url"
+                    value={formData.facebook}
+                    onChange={(e) => setFormData({...formData, facebook: e.target.value})}
+                    className="px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                    placeholder="Facebook URL"
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                  <input
+                    type="url"
+                    value={formData.instagram}
+                    onChange={(e) => setFormData({...formData, instagram: e.target.value})}
+                    className="px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                    placeholder="Instagram URL"
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                  <input
+                    type="url"
+                    value={formData.linkedin}
+                    onChange={(e) => setFormData({...formData, linkedin: e.target.value})}
+                    className="px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                    placeholder="LinkedIn URL"
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                  <input
+                    type="url"
+                    value={formData.tiktok}
+                    onChange={(e) => setFormData({...formData, tiktok: e.target.value})}
+                    className="px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                    placeholder="TikTok URL"
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-4 pt-4">
                 <button
                   onClick={resetApp}
@@ -897,39 +772,143 @@ ${aiEnabled ? 'This proposal includes AI-generated insights based on comprehensi
           </div>
         )}
 
-        {/* Enhanced Page 2 with AI Insights */}
+        {/* Page 2: Industry Analysis */}
         {currentPage === 2 && industryData && (
           <div className="bg-white rounded-2xl shadow-2xl p-8 border-t-4 border-red-500">
             <h2 className="text-3xl font-bold text-gray-900 mb-6">{text[language].industryAnalysis}</h2>
             
-            {/* AI Insights Section */}
-            {aiEnabled && industryData.insights && (
-              <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 p-6 rounded-xl shadow-md">
-                <div className="flex items-center gap-3 mb-3">
-                  <Sparkles className="w-6 h-6 text-purple-500" />
-                  <h3 className="font-bold text-gray-900 text-lg">{text[language].aiRecommendations}</h3>
-                </div>
-                <p className="text-gray-700" dir={language === 'ar' ? 'rtl' : 'ltr'}>{industryData.insights}</p>
-              </div>
-            )}
-
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-red-50 to-yellow-50 border-l-4 border-red-500 p-6 rounded-xl shadow-md">
                 <h3 className="font-bold text-gray-900 mb-2 text-lg uppercase tracking-wide">{text[language].detectedIndustry}</h3>
                 <p className="text-2xl font-bold text-red-600">{industryData.industry}</p>
-                {aiEnabled && (
-                  <p className="text-green-600 text-sm mt-2">
-                    {language === 'ar' ? '✓ معزز بالذكاء الاصطناعي' : '✓ AI Enhanced'}
-                  </p>
-                )}
               </div>
 
-              {/* Rest of the analysis content */}
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide">{text[language].challenges}</h3>
+                <div className="space-y-3">
+                  {industryData.challenges.map((challenge, index) => (
+                    <div key={index} className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border-l-4 border-red-500">
+                      <div className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      <p className="text-gray-700">{challenge}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 uppercase tracking-wide">{text[language].recommended}</h3>
+                <div className="space-y-4">
+                  {industryData.services.map((service, index) => (
+                    <div key={index} className="border-2 border-gray-200 rounded-xl p-6 hover:border-red-500 transition-all bg-white shadow-sm">
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-lg">{service.name}</h4>
+                          <p className="text-sm text-green-600 font-semibold">{service.pricing}</p>
+                        </div>
+                      </div>
+                      <p className="text-gray-700 mb-3">{service.desc}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {service.features.map((feature, idx) => (
+                          <span key={idx} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">{text[language].objections}</label>
+                <textarea
+                  value={objections}
+                  onChange={(e) => setObjections(e.target.value)}
+                  className="w-full px-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-lg"
+                  rows={3}
+                  placeholder={text[language].objPlaceholder}
+                  dir={language === 'ar' ? 'rtl' : 'ltr'}
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  className="px-8 py-4 bg-gray-200 hover:bg-gray-300 rounded-xl font-semibold transition-all shadow-md"
+                >
+                  {text[language].back}
+                </button>
+                <button
+                  onClick={generatePDF}
+                  disabled={loading}
+                  className="flex-1 px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+                >
+                  {loading ? (language === 'ar' ? 'جاري الإنشاء...' : 'Generating...') : text[language].generate}
+                  {!loading && <ChevronRight className="w-6 h-6" />}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Enhanced Download Modal with Arabic Support */}
+        {/* Page 3: Final Proposal */}
+        {currentPage === 3 && (
+          <div className="bg-white rounded-2xl shadow-2xl p-8 border-t-4 border-green-500">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <FileText className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{text[language].proposal}</h2>
+              <p className="text-gray-600 text-lg">
+                {language === 'ar' ? `تم إنشاء عرض مخصص لـ ${formData.companyName}` : `Custom proposal generated for ${formData.companyName}`}
+              </p>
+            </div>
+
+            <div className="space-y-6 mb-8">
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 p-6 rounded-xl shadow-md">
+                <h3 className="font-bold text-gray-900 mb-3 text-lg uppercase tracking-wide">{text[language].selectedServices}</h3>
+                <div className="space-y-3">
+                  {selectedServices.map((service, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        ✓
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">{service.name}</p>
+                        <p className="text-sm text-gray-600">{service.desc}</p>
+                        <p className="text-sm text-green-600 font-semibold">{service.pricing}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <button
+                  onClick={() => setShowDownloadModal(true)}
+                  className="px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <Download className="w-6 h-6" />
+                  {text[language].download}
+                </button>
+                <button
+                  onClick={resetApp}
+                  className="px-8 py-4 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <Globe className="w-6 h-6" />
+                  {text[language].newProposal}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Download Modal */}
         {showDownloadModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-3xl p-8 max-w-5xl w-full shadow-2xl" dir={language === 'ar' ? 'rtl' : 'ltr'}>
